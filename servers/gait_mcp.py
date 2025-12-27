@@ -11,8 +11,9 @@ Design goals:
 - Provide remote add/list/get + push/fetch/pull/clone + repo create
 
 Gemini-CLI note:
-Some Gemini wrappers call tools as:
-  tool_name(args=[...], kwargs={...})
+Some Gemini wrappers call tools using one of these styles:
+  tool(args=[...], kwargs={...})
+  tool(call_args=[...], call_kwargs={...})
 So we must accept and unpack those safely.
 """
 
@@ -25,6 +26,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+
 # ---------------------------------------------------------------------
 # Logging (stderr only)
 # ---------------------------------------------------------------------
@@ -35,6 +37,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("GaitMCP")
 
+
 # ---------------------------------------------------------------------
 # MCP
 # ---------------------------------------------------------------------
@@ -42,6 +45,7 @@ try:
     from mcp.server.fastmcp import FastMCP
 except Exception:
     from fastmcp import FastMCP  # type: ignore
+
 
 # ---------------------------------------------------------------------
 # GAIT core
@@ -51,6 +55,7 @@ from gait.schema import Turn
 from gait.tokens import count_turn_tokens
 from gait.objects import short_oid
 from gait.log import walk_commits
+
 
 # ---------------------------------------------------------------------
 # GAIT remote (your real implementation)
@@ -164,27 +169,39 @@ def _resolve_revert_target(repo: GaitRepo, target: str) -> str:
     return _resolve_commit_prefix_from_head(repo, head, t)
 
 
-def _unpack_wrapper_call(kwargs: Dict[str, Any]) -> Tuple[List[Any], Dict[str, Any]]:
+def _unpack_wrapper_call(call_kwargs: Dict[str, Any]) -> Tuple[List[Any], Dict[str, Any]]:
     """
-    Gemini wrapper sometimes calls: tool(args=[...], kwargs={...})
-    We normalize that here.
+    Normalize Gemini wrapper calling styles into (args, kwargs).
+
+    Supported wrapper payloads:
+      - {"args":[...], "kwargs":{...}}
+      - {"call_args":[...], "call_kwargs":{...}}
+
+    If neither wrapper exists, treat call_kwargs as real kwargs (minus any stray wrapper keys).
     """
-    if "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
-        inner_kwargs = dict(kwargs["kwargs"])
+    # Prefer call_args/call_kwargs if present, else args/kwargs
+    if "call_args" in call_kwargs or "call_kwargs" in call_kwargs:
+        akey, kkey = "call_args", "call_kwargs"
     else:
-        inner_kwargs = {}
+        akey, kkey = "args", "kwargs"
 
-    if "args" in kwargs and isinstance(kwargs["args"], list):
-        inner_args = list(kwargs["args"])
-    else:
-        inner_args = []
+    inner_args: List[Any] = []
+    inner_kwargs: Dict[str, Any] = {}
 
-    # If wrapper DIDN'T use args/kwargs, then treat original kwargs as real kwargs.
+    if kkey in call_kwargs and isinstance(call_kwargs[kkey], dict):
+        inner_kwargs = dict(call_kwargs[kkey])
+
+    if akey in call_kwargs and isinstance(call_kwargs[akey], list):
+        inner_args = list(call_kwargs[akey])
+
+    # If wrapper DIDN'T actually use either form, treat outer kwargs as real kwargs.
     if not inner_args and not inner_kwargs:
-        # but strip any accidental wrapper keys if present
-        outer = dict(kwargs)
+        outer = dict(call_kwargs)
+        # strip any wrapper keys if present
         outer.pop("args", None)
         outer.pop("kwargs", None)
+        outer.pop("call_args", None)
+        outer.pop("call_kwargs", None)
         return ([], outer)
 
     return (inner_args, inner_kwargs)
@@ -193,15 +210,15 @@ def _unpack_wrapper_call(kwargs: Dict[str, Any]) -> Tuple[List[Any], Dict[str, A
 def mcp_tool(fn):
     """
     Decorator that:
-    1) Accepts Gemini wrapper calling style (args/kwargs)
-    2) Converts exceptions to structured {"ok": False, ...}
+    - accepts Gemini wrapper calling style (args/kwargs or call_args/call_kwargs)
+    - preserves normal MCP calls
+    - converts exceptions to structured {"ok": False, ...}
     """
     def wrapper(*call_args: Any, **call_kwargs: Any):
         try:
-            # First: handle wrapper-style invocations passed as kwargs
             args2, kwargs2 = _unpack_wrapper_call(call_kwargs)
 
-            # If the MCP runtime passed positional args normally, preserve them
+            # If MCP runtime passed positional args normally, preserve them
             if call_args:
                 args2 = list(call_args) + args2
 
@@ -211,7 +228,6 @@ def mcp_tool(fn):
             log.exception("tool failed: %s", fn.__name__)
             return _err(f"{fn.__name__} failed", detail=str(e))
 
-    # preserve name for nicer logs
     wrapper.__name__ = fn.__name__
     return wrapper
 
@@ -601,6 +617,7 @@ def gait_pull(
 
     tok = _get_gaithub_token(token)
     spec = _remote_spec(repo, remote, owner, repo_name)
+
     merge_id = remote_pull(
         repo,
         spec,
@@ -609,8 +626,12 @@ def gait_pull(
         with_memory=with_memory,
     )
 
-    out: Dict[str, Any] = {"ok": True, "pulled": f"{remote}/{branch or repo.current_branch()}",
-                           "into": repo.current_branch(), "head": merge_id}
+    out: Dict[str, Any] = {
+        "ok": True,
+        "pulled": f"{remote}/{branch or repo.current_branch()}",
+        "into": repo.current_branch(),
+        "head": merge_id,
+    }
     if with_memory:
         out["memory"] = repo.read_memory_ref(repo.current_branch())
     return out
@@ -629,9 +650,6 @@ def gait_clone(
 ) -> Dict[str, Any]:
     """
     Clone a GAIT repo from a GAITHUB-compatible remote into a local folder.
-
-    Example:
-      url="https://gait-hub.com" owner="john" repo_name="hello" path="./hello-clone"
     """
     tok = _get_gaithub_token(token)  # may be None if your server allows anonymous clone
     dest = Path(path).expanduser().resolve()
@@ -680,7 +698,7 @@ def gait_resume(
     else:
         cid = _resolve_commit_prefix_from_head(repo, head, t)
 
-    # Walk first-parent commits collecting turns (most recent first)
+    # Walk first-parent commits collecting turns (newest-first)
     want = max(0, int(turns))
     collected: List[Dict[str, str]] = []
     seen = set()
@@ -691,7 +709,6 @@ def gait_resume(
         c = repo.get_commit(cur)
         turn_ids = c.get("turn_ids") or []
 
-        # Preserve order within the commit
         for tid in turn_ids:
             if len(collected) >= want:
                 break
@@ -704,7 +721,6 @@ def gait_resume(
         parents = c.get("parents") or []
         cur = parents[0] if parents else ""
 
-    # We collected newest-first; reverse so it's chronological
     collected.reverse()
 
     bundle: Dict[str, Any] = {
