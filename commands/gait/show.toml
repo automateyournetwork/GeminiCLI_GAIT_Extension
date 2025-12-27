@@ -1,0 +1,8 @@
+name = "gait:show"
+description = "Show turns (Q/A) for a commit (default HEAD)."
+
+prompt = """
+If the user provides a commit id/prefix, call gait_show(commit="<that>").
+Otherwise call gait_show() to show HEAD.
+Display the turns clearly as User / Assistant blocks.
+"""

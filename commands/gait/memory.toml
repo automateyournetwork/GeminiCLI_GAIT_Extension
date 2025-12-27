@@ -1,0 +1,7 @@
+name = "gait:memory"
+description = "List pinned memory items for the current branch."
+
+prompt = """
+Call gait_memory() and display the pinned list with indexes and notes.
+Mention /gait:pin and /gait:unpin as next actions.
+"""

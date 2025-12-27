@@ -1,0 +1,9 @@
+name = "gait:pin"
+description = "Pin the last commit-with-turns into GAIT memory."
+
+prompt = """
+Default behavior: pin the last commit with turns.
+Call gait_pin(last=true, note="") unless the user provides a note.
+If the user provides a note, pass it as note=...
+After pinning, show updated /gait:memory.
+"""

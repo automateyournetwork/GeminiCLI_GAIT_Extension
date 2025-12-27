@@ -1,0 +1,9 @@
+name = "gait:context"
+description = "Show the compiled pinned context bundle used for prompting."
+
+prompt = """
+Call gait_context(full=false) and summarize:
+- branch, memory_id, pinned_items
+Then show each PIN with note, user_text, assistant_text.
+If user asks for full details, call gait_context(full=true).
+"""

@@ -1,0 +1,8 @@
+name = "gait:log"
+description = "Show recent GAIT commits (short IDs, message, parents, turn counts)."
+
+prompt = """
+Call gait_log(limit=20) and show a readable summary:
+- commit, created_at, kind, parents, turns, message
+If the user asks for more, increase limit.
+"""

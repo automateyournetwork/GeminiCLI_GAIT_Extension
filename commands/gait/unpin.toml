@@ -1,0 +1,8 @@
+name = "gait:unpin"
+description = "Unpin a memory item by index."
+
+prompt = """
+If the user gave an index, call gait_unpin(index=<int>).
+If not, first call gait_memory() and ask them which index to remove.
+After unpinning, show updated /gait:memory.
+"""

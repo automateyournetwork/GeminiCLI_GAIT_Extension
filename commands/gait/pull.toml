@@ -5,9 +5,10 @@ prompt = """
 Pull remote changes into the current GAIT branch.
 
 Parse:
-- /gait:pull origin --owner <owner> --repo <repo>
+- /gait:pull origin --owner <owner> --repo <repo> [--branch <branch>] [--with-memory]
 
 Action:
-- Call gait_pull(remote="origin", owner="<owner>", repo="<repo>", branch="") unless branch specified.
-- Print result and resulting HEAD.
+- Call gait_pull(remote="origin", owner="<owner>", repo_name="<repo>", branch="<branch or empty>", with_memory=<true/false>, token="")
+  (token may be omitted if GAITHUB_TOKEN is set)
+- Print result and then call gait_status() and print resulting HEAD.
 """

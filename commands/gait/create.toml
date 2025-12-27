@@ -1,0 +1,8 @@
+name = "gait:repo-create"
+description = "Create/init a remote repo on GAITHUB."
+
+prompt = """
+Call gait_repo_create(remote="origin", owner=..., repo_name=..., token="") using:
+- token can be omitted if GAITHUB_TOKEN is set
+If owner/repo are missing, ask the user for them.
+"""

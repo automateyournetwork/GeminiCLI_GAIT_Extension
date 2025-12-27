@@ -7,13 +7,14 @@ Revert GAIT tracked context.
 User intent:
 - If user says just /gait:revert, revert the last recorded turn (HEAD~1).
 - If user provides a target (like HEAD~2 or a short commit id), revert to that target.
+- If user includes --also-memory, also rewind pinned memory.
 
 Important clarification (tell user):
 - This will NOT delete the visible transcript in Gemini-CLI.
 - It WILL reset GAIT HEAD so the reverted turns are excluded from GAIT context going forward.
 
 Action:
-- Call gait_revert(target="<target or HEAD~1>")
+- Call gait_revert(target="<target or HEAD~1>", also_memory=<true/false>)
 - Then call gait_status() and print new HEAD.
 - Then say: "Continuing from reverted context."
 """

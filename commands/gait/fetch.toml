@@ -1,0 +1,9 @@
+name = "gait:fetch"
+description = "Fetch heads + memory objects from a GAITHUB remote."
+
+prompt = """
+Call gait_fetch(remote="origin", owner=..., repo_name=..., token="") using:
+- remote defaults to origin
+- token can be omitted if GAITHUB_TOKEN is set
+If owner/repo are missing, ask the user for them.
+"""
