@@ -634,5 +634,79 @@ def gait_clone(
     return {"ok": True, "cloned": f"{owner}/{repo_name}", "into": str(dest), "branch": branch, "remote": remote}
 
 
+@mcp.tool()
+@mcp_tool
+def gait_resume(
+    target: str = "HEAD",
+    turns: int = 20,
+    include_pinned_memory: bool = True,
+) -> Dict[str, Any]:
+    """
+    Return a 'resume bundle' of the last N turns ending at target.
+
+    Notes:
+    - This does NOT modify the repo. It's read-only.
+    - Gemini-CLI transcript cannot be erased; this bundle is what the assistant should
+      treat as the canonical context going forward.
+    """
+    repo, err = _try_repo()
+    if err:
+        return err
+    assert repo is not None
+
+    head = repo.head_commit_id() or ""
+    if not head:
+        return _err("No commits yet; nothing to resume.")
+
+    # Resolve target
+    t = (target or "").strip()
+    if t in ("", "HEAD", "@"):
+        cid = head
+    else:
+        cid = _resolve_commit_prefix_from_head(repo, head, t)
+
+    # Walk first-parent commits collecting turns (most recent first)
+    want = max(0, int(turns))
+    collected: List[Dict[str, str]] = []
+    seen = set()
+    cur = cid
+
+    while cur and cur not in seen and len(collected) < want:
+        seen.add(cur)
+        c = repo.get_commit(cur)
+        turn_ids = c.get("turn_ids") or []
+
+        # Preserve order within the commit
+        for tid in turn_ids:
+            if len(collected) >= want:
+                break
+            tdata = repo.get_turn(tid)
+            user_txt = (tdata.get("user") or {}).get("text", "")
+            asst_txt = (tdata.get("assistant") or {}).get("text", "")
+            if user_txt or asst_txt:
+                collected.append({"user": user_txt, "assistant": asst_txt})
+
+        parents = c.get("parents") or []
+        cur = parents[0] if parents else ""
+
+    # We collected newest-first; reverse so it's chronological
+    collected.reverse()
+
+    bundle: Dict[str, Any] = {
+        "ok": True,
+        "branch": repo.current_branch(),
+        "head": short_oid(repo.head_commit_id() or ""),
+        "target": short_oid(cid),
+        "turns_requested": want,
+        "turns_returned": len(collected),
+        "turns": collected,
+    }
+
+    if include_pinned_memory:
+        bundle["pinned_context"] = repo.build_context_bundle(full=False)
+
+    return bundle
+
+
 if __name__ == "__main__":
     mcp.run()

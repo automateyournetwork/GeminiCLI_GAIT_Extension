@@ -1,0 +1,20 @@
+name = "gait:resume"
+description = "Resume the last N GAIT turns into the working context"
+
+prompt = """
+Resume GAIT context for this repo.
+
+Parse:
+- /gait:resume                -> target=HEAD turns=20
+- /gait:resume 10             -> target=HEAD turns=10
+- /gait:resume HEAD~2 15       -> target=HEAD~2 turns=15
+- /gait:resume <commit> 25     -> target=<commit> turns=25
+
+Actions:
+1) Call gait_resume(target="<target>", turns=<N>, include_pinned_memory=true)
+
+Then:
+- Print a short summary: branch, target, turns_returned.
+- Then restate: "Continuing from this resumed GAIT context."
+- CRITICAL LOOP GUARD: Do NOT call gait_record_turn() after this command.
+"""
