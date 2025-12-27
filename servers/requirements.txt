@@ -1,2 +1,3 @@
 mcp
 fastmcp
+gait-ai
