@@ -2,6 +2,14 @@ GAIT — Git for AI Tracking (Gemini-CLI Extension)
 
 GAIT (Git for AI Tracking) brings Git-style version control to AI conversations.
 
+Install this extension 
+
+```bash
+
+gemini extensions install https://github.com/automateyournetwork/GeminiCLI_GAIT_Extension.git
+
+```
+
 This repository provides a Gemini-CLI extension that automatically tracks prompts, responses, context, and branching history using GAIT as a persistent backend.
 
 Think of GAIT as version control for AI reasoning.
