@@ -1,0 +1,17 @@
+name = "gait:delete"
+description = "Delete a GAIT branch"
+
+prompt = """
+Delete a local GAIT branch.
+
+Parse:
+- /gait:delete <branch_name>
+
+Rules:
+- Refuse if branch is current branch (must checkout another branch first).
+- If branch doesn't exist, say so.
+
+Action:
+- Call gait_delete_branch(name="<branch_name>")
+- Confirm.
+"""

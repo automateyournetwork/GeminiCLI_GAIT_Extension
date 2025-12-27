@@ -1,0 +1,60 @@
+name = "gait:help"
+description = "Show GAIT MCP help and quick usage"
+
+prompt = """
+When user asks for help about GAIT, show the following:
+
+GAIT (Git for AI Tracking inside Gemini-CLI)
+-------------------------------------------
+Goal:
+- Every user/assistant turn is tracked into a GAIT repo (turn commits).
+- Branching, reverting, and memory pins let you manage conversational context safely.
+- Remote push/pull/clone let you sync GAIT history across machines.
+
+Commands:
+• /gait:status
+    Show current GAIT repo root, branch, and HEAD.
+
+• /gait:init
+    Initialize GAIT in the CURRENT folder.
+    IMPORTANT: refuse if current folder is filesystem root.
+
+• /gait:remote origin <url>
+    Set or show a remote named origin.
+
+• /gait:push origin --owner <owner> --repo <repo>
+    Push current branch to remote.
+
+• /gait:pull origin --owner <owner> --repo <repo>
+    Pull remote into current branch.
+
+• /gait:branch <name>
+    Create a branch from current HEAD.
+
+• /gait:checkout <name>
+    Switch branches.
+
+• /gait:merge <source>
+    Merge a source branch into the current branch.
+
+• /gait:delete <name>
+    Delete a branch (local).
+
+• /gait:revert [target]
+    Move HEAD back to undo the last turn(s) from GAIT context.
+    NOTE: This does not delete the visible CLI transcript, but it DOES remove those turns from GAIT context going forward.
+
+Memory:
+• /gait:pin last [note=...]
+• /gait:memory
+• /gait:context
+
+Examples:
+• /gait:init
+• /gait:status
+• /gait:branch experiments
+• /gait:checkout experiments
+• /gait:revert            (undo last recorded turn)
+• /gait:revert HEAD~2      (undo last 2 turns, if supported)
+• /gait:push origin --owner john --repo my-ai-project
+"""

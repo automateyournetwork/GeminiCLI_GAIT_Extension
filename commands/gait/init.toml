@@ -1,0 +1,14 @@
+name = "gait:init"
+description = "Initialize GAIT in the current working folder (refuse at filesystem root)"
+
+prompt = """
+Initialize GAIT in the current working directory.
+
+Rules:
+- Do NOT initialize if the current folder is the filesystem root (/, C:\\, etc).
+- If refusing, explain clearly: user must cd into a project folder first.
+
+Action:
+- Call the MCP tool gait_init(path=".").
+- Then call gait_status() and show the branch + HEAD.
+"""

@@ -1,0 +1,13 @@
+name = "gait:pull"
+description = "Pull from remote into current GAIT branch"
+
+prompt = """
+Pull remote changes into the current GAIT branch.
+
+Parse:
+- /gait:pull origin --owner <owner> --repo <repo>
+
+Action:
+- Call gait_pull(remote="origin", owner="<owner>", repo="<repo>", branch="") unless branch specified.
+- Print result and resulting HEAD.
+"""

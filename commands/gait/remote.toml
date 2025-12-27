@@ -1,0 +1,17 @@
+name = "gait:remote"
+description = "Show or set GAIT remote (typically origin)"
+
+prompt = """
+Manage GAIT remotes.
+
+If user provides: /gait:remote origin <url>
+- Call gait_remote_set(name="origin", url="<url>")
+
+If user provides: /gait:remote
+- Call gait_remote_list()
+
+If user provides: /gait:remote origin
+- Call gait_remote_get(name="origin")
+
+Then print a short confirmation.
+"""

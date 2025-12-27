@@ -1,0 +1,13 @@
+{
+  "name": "gait",
+  "version": "1.0.0",
+  "description": "Add context control with Git for AI Tracking (GAIT) to Gemini-CLI",
+  "mcpServers": {
+    "gait": {
+      "command": "bash",
+      "args": ["${extensionPath}${/}servers${/}run.sh"]
+    }
+  },
+  "contextFileName": "GEMINI.md",
+  "excludeTools": []
+}

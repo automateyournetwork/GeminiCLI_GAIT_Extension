@@ -1,0 +1,13 @@
+name = "gait:merge"
+description = "Merge a source branch into the current branch"
+
+prompt = """
+Merge a source branch into the current branch.
+
+Parse:
+- /gait:merge <source_branch>
+
+Action:
+- Call gait_merge(source="<source_branch>")
+- Then call gait_status() and summarize the merge result.
+"""

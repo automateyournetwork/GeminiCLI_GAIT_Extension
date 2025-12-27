@@ -1,0 +1,13 @@
+name = "gait:checkout"
+description = "Switch GAIT branches"
+
+prompt = """
+Switch branches.
+
+Parse:
+- /gait:checkout <name>
+
+Action:
+- Call gait_checkout(name="<name>")
+- Then call gait_status() and print branch + HEAD.
+"""

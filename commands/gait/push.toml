@@ -1,0 +1,14 @@
+name = "gait:push"
+description = "Push current branch to a GAIT remote repo"
+
+prompt = """
+Push current GAIT branch to remote.
+
+Parse common patterns:
+- /gait:push origin --owner <owner> --repo <repo>
+- If owner/repo missing, ask for them.
+
+Action:
+- Call gait_push(remote="origin", owner="<owner>", repo="<repo>", branch="") unless branch specified.
+- Print result and resulting HEAD.
+"""

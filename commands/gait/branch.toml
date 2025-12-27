@@ -1,0 +1,13 @@
+name = "gait:branch"
+description = "Create a GAIT branch from the current HEAD"
+
+prompt = """
+Create a new branch.
+
+Parse:
+- /gait:branch <name>
+
+Action:
+- Call gait_branch(name="<name>", from_commit=null, inherit_memory=true, force=false)
+- Then call gait_checkout(name="<name>") if user asked to switch, otherwise just confirm created.
+"""
