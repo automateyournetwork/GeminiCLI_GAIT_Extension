@@ -617,7 +617,7 @@ def gait_pull(
 
 
 @mcp.tool()
-@mcp_tool
+@_safe_tool
 def gait_clone(
     url: str,
     owner: str,
@@ -627,11 +627,26 @@ def gait_clone(
     branch: str = "main",
     token: str = "",
 ) -> Dict[str, Any]:
-    tok = _get_gaithub_token(token)
-    dest = Path(path).resolve()
+    """
+    Clone a GAIT repo from a GAITHUB-compatible remote into a local folder.
+
+    Example:
+      url="https://gait-hub.com" owner="john" repo_name="hello" path="./hello-clone"
+    """
+    tok = _get_gaithub_token(token)  # may be None if your server allows anonymous clone
+    dest = Path(path).expanduser().resolve()
+
     spec = RemoteSpec(base_url=url, owner=owner, repo=repo_name, name=remote)
     clone_into(dest, spec, token=tok, branch=branch)
-    return {"ok": True, "cloned": f"{owner}/{repo_name}", "into": str(dest), "branch": branch, "remote": remote}
+
+    return {
+        "ok": True,
+        "cloned": f"{owner}/{repo_name}",
+        "into": str(dest),
+        "branch": branch,
+        "remote": remote,
+        "url": url,
+    }
 
 
 @mcp.tool()

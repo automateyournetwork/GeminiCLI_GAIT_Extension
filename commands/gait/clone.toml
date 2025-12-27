@@ -1,0 +1,34 @@
+name = "gait:clone"
+description = "Clone a cloud-hosted GAIT repo into a local folder"
+
+prompt = """
+Clone a GAIT repo from a GAITHUB-compatible remote.
+
+Accepted forms:
+1) /gait:clone https://gait-hub.com/<owner>/<repo> <path>
+2) /gait:clone <owner>/<repo> <path>
+3) /gait:clone <remote_name> <owner>/<repo> <path>
+
+Optional key=value args anywhere:
+- url=<base_url>        (default: if a remote_name is given, resolve via gait_remote_get; else require url)
+- branch=<branch>       (default: main)
+- remote=<remote_name>  (default: origin)
+- token=<token>         (default: env GAITHUB_TOKEN if set)
+
+Parsing rules:
+- If user provides a full URL with /owner/repo in it, split it into:
+  url=<scheme+host>, owner, repo_name
+- If user provides owner/repo without a url:
+  - If first token looks like a configured remote name (e.g., origin), call gait_remote_get(name=<remote>)
+    and use that as url.
+  - Otherwise ask for the base url, e.g. "https://gait-hub.com" or tell them to run /gait:remote origin <url>.
+
+Action:
+- Call gait_clone(url="<base_url>", owner="<owner>", repo_name="<repo>", path="<path>", branch="<branch>", remote="<remote>", token="<token>")
+
+After:
+- Print a short confirmation: cloned owner/repo into path (branch=..., remote=..., url=...).
+
+CRITICAL LOOP GUARD:
+- Do NOT call gait_record_turn() after this command.
+"""
