@@ -617,7 +617,7 @@ def gait_pull(
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_clone(
     url: str,
     owner: str,
