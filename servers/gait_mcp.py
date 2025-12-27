@@ -2,10 +2,6 @@
 """
 MCP Server: GAIT (Git for AI Tracking) for Gemini-CLI.
 
-Gemini-CLI is the chat UI.
-This server provides GAIT repo/memory/remote tools plus gait_record_turn()
-so every Gemini turn can be persisted automatically.
-
 Design goals:
 - STDIO MCP: NEVER write to stdout except protocol (FastMCP handles this)
 - Log to STDERR only
@@ -13,6 +9,11 @@ Design goals:
 - Enforce: DO NOT init at filesystem root
 - Provide GAIT-native revert/reset semantics (optionally also reset memory)
 - Provide remote add/list/get + push/fetch/pull/clone + repo create
+
+Gemini-CLI note:
+Some Gemini wrappers call tools as:
+  tool_name(args=[...], kwargs={...})
+So we must accept and unpack those safely.
 """
 
 from __future__ import annotations
@@ -68,11 +69,10 @@ from gait.remote import (
 
 mcp = FastMCP("GAIT MCP")
 
+
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
-
-
 def _err(msg: str, *, detail: str = "", **extra: Any) -> Dict[str, Any]:
     out: Dict[str, Any] = {"ok": False, "error": msg}
     if detail:
@@ -136,7 +136,7 @@ def _resolve_revert_target(repo: GaitRepo, target: str) -> str:
       - "" or "HEAD~1" -> one step back
       - "HEAD~N"
       - short/full commit id prefix (scanned from HEAD)
-    Returns the commit id to reset the branch ref to (or "" for empty)
+    Returns the commit id to reset the branch ref to (or "" for empty).
     """
     t = (target or "").strip()
     head = repo.head_commit_id() or ""
@@ -159,37 +159,68 @@ def _resolve_revert_target(repo: GaitRepo, target: str) -> str:
             cid = parents[0] if parents else ""
             if not cid:
                 break
+        return cid  # may be "" meaning empty
 
-        if cid == "":
-            # beyond history => empty branch
-            return ""
-        return cid
-
-    # otherwise interpret as prefix/full hash
     return _resolve_commit_prefix_from_head(repo, head, t)
 
 
-def _safe_tool(fn):
+def _unpack_wrapper_call(kwargs: Dict[str, Any]) -> Tuple[List[Any], Dict[str, Any]]:
     """
-    Decorator: converts uncaught exceptions into structured tool errors.
-    Keeps server stable and avoids protocol stdout.
+    Gemini wrapper sometimes calls: tool(args=[...], kwargs={...})
+    We normalize that here.
     """
-    def wrapper(*args, **kwargs):
+    if "kwargs" in kwargs and isinstance(kwargs["kwargs"], dict):
+        inner_kwargs = dict(kwargs["kwargs"])
+    else:
+        inner_kwargs = {}
+
+    if "args" in kwargs and isinstance(kwargs["args"], list):
+        inner_args = list(kwargs["args"])
+    else:
+        inner_args = []
+
+    # If wrapper DIDN'T use args/kwargs, then treat original kwargs as real kwargs.
+    if not inner_args and not inner_kwargs:
+        # but strip any accidental wrapper keys if present
+        outer = dict(kwargs)
+        outer.pop("args", None)
+        outer.pop("kwargs", None)
+        return ([], outer)
+
+    return (inner_args, inner_kwargs)
+
+
+def mcp_tool(fn):
+    """
+    Decorator that:
+    1) Accepts Gemini wrapper calling style (args/kwargs)
+    2) Converts exceptions to structured {"ok": False, ...}
+    """
+    def wrapper(*call_args: Any, **call_kwargs: Any):
         try:
-            return fn(*args, **kwargs)
+            # First: handle wrapper-style invocations passed as kwargs
+            args2, kwargs2 = _unpack_wrapper_call(call_kwargs)
+
+            # If the MCP runtime passed positional args normally, preserve them
+            if call_args:
+                args2 = list(call_args) + args2
+
+            return fn(*args2, **kwargs2)
+
         except Exception as e:
             log.exception("tool failed: %s", fn.__name__)
             return _err(f"{fn.__name__} failed", detail=str(e))
+
+    # preserve name for nicer logs
+    wrapper.__name__ = fn.__name__
     return wrapper
 
 
 # ---------------------------------------------------------------------
 # Core repo tools
 # ---------------------------------------------------------------------
-
-
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_status() -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
@@ -199,18 +230,19 @@ def gait_status() -> Dict[str, Any]:
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_init(path: str = ".") -> Dict[str, Any]:
     root = Path(path).resolve()
     if _is_filesystem_root(root):
         return _err("Refusing to initialize GAIT at filesystem root. cd into a working folder first.", path=str(root))
+
     repo = GaitRepo(root=root)
     repo.init()
     return {"ok": True, "root": str(repo.root), "gait_dir": str(repo.gait_dir)}
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_branch(
     name: str,
     from_commit: Optional[str] = None,
@@ -238,58 +270,19 @@ def gait_branch(
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_checkout(name: str) -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
         return err
     assert repo is not None
+
     repo.checkout(name)
     return {"ok": True, "branch": repo.current_branch(), "head": repo.head_commit_id() or ""}
 
 
 @mcp.tool()
-@_safe_tool
-def gait_delete_branch(name: str, force: bool = False) -> Dict[str, Any]:
-    """
-    Mirrors cmd_delete behavior:
-    - refuse delete 'main' unless force
-    - refuse delete current branch unless force (and switch to main first)
-    """
-    repo, err = _try_repo()
-    if err:
-        return err
-    assert repo is not None
-
-    b = name.strip()
-    if b == "main" and not force:
-        return _err("Refusing to delete 'main' without force=true", branch=b)
-
-    cur = repo.current_branch()
-    if b == cur and not force:
-        return _err("Refusing to delete current branch without force=true", branch=b)
-
-    ref = repo.refs_dir / b
-    mem = repo.memory_refs_dir / b
-
-    if not ref.exists():
-        return {"ok": True, "deleted": False, "branch": b, "note": "no such branch"}
-
-    if b == cur and force:
-        if (repo.refs_dir / "main").exists():
-            repo.checkout("main")
-        else:
-            return _err("Cannot force-delete current branch: no 'main' branch exists", branch=b)
-
-    ref.unlink()
-    if mem.exists():
-        mem.unlink()
-
-    return {"ok": True, "deleted": True, "branch": b, "current_branch": repo.current_branch()}
-
-
-@mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_merge(source: str, message: str = "", with_memory: bool = False) -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
@@ -297,14 +290,14 @@ def gait_merge(source: str, message: str = "", with_memory: bool = False) -> Dic
     assert repo is not None
 
     merge_id = repo.merge(source, message=message or "", with_memory=with_memory)
-    out = {"ok": True, "merged": source, "branch": repo.current_branch(), "head": short_oid(merge_id)}
+    out: Dict[str, Any] = {"ok": True, "merged": source, "branch": repo.current_branch(), "head": short_oid(merge_id)}
     if with_memory:
         out["memory"] = repo.read_memory_ref(repo.current_branch())
     return out
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_log(limit: int = 20) -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
@@ -331,11 +324,8 @@ def gait_log(limit: int = 20) -> Dict[str, Any]:
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_show(commit: str = "HEAD") -> Dict[str, Any]:
-    """
-    Return commit details + attached turns (user/assistant text).
-    """
     repo, err = _try_repo()
     if err:
         return err
@@ -375,10 +365,8 @@ def gait_show(commit: str = "HEAD") -> Dict[str, Any]:
 # ---------------------------------------------------------------------
 # Memory tools
 # ---------------------------------------------------------------------
-
-
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_memory() -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
@@ -393,7 +381,7 @@ def gait_memory() -> Dict[str, Any]:
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_context(full: bool = False) -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
@@ -403,7 +391,7 @@ def gait_context(full: bool = False) -> Dict[str, Any]:
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_pin(commit: Optional[str] = None, last: bool = True, note: str = "") -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
@@ -415,7 +403,7 @@ def gait_pin(commit: Optional[str] = None, last: bool = True, note: str = "") ->
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_unpin(index: int) -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
@@ -429,10 +417,8 @@ def gait_unpin(index: int) -> Dict[str, Any]:
 # ---------------------------------------------------------------------
 # Turn recording (auto tracking)
 # ---------------------------------------------------------------------
-
-
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_record_turn(
     user_text: str,
     assistant_text: str,
@@ -467,17 +453,11 @@ def gait_record_turn(
 
 
 # ---------------------------------------------------------------------
-# Revert / reset (matches your CLI cmd_revert)
+# Revert / reset
 # ---------------------------------------------------------------------
-
-
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_revert(target: str = "HEAD~1", also_memory: bool = False) -> Dict[str, Any]:
-    """
-    GAIT-native revert = reset branch HEAD (default: first parent of HEAD).
-    Optionally also rewinds memory (like cmd_revert --also-memory).
-    """
     repo, err = _try_repo()
     if err:
         return err
@@ -488,23 +468,20 @@ def gait_revert(target: str = "HEAD~1", also_memory: bool = False) -> Dict[str, 
     if not head_before:
         return _err("Nothing to revert (branch has no commits).", branch=branch)
 
-    # Resolve target -> commit id or "" (empty)
     new_head = _resolve_revert_target(repo, target)
 
-    # Use your repo.reset_branch() if available (it resolves/validates)
     if new_head == "":
         repo.write_ref(branch, "")
         head_after = ""
     else:
-        resolved = repo.reset_branch(new_head)
-        head_after = resolved
+        head_after = repo.reset_branch(new_head)
 
     out: Dict[str, Any] = {
         "ok": True,
         "branch": branch,
         "head_before": short_oid(head_before),
         "head_after": short_oid(head_after) if head_after else "(empty)",
-        "note": "GAIT history is now rewound. Gemini-CLI transcript cannot be erased, but GAIT context going forward uses the reverted history.",
+        "note": "GAIT history rewound. Gemini-CLI transcript stays, but GAIT context going forward uses reverted history.",
     }
 
     if also_memory:
@@ -517,47 +494,46 @@ def gait_revert(target: str = "HEAD~1", also_memory: bool = False) -> Dict[str, 
 
 
 # ---------------------------------------------------------------------
-# Remote tools (wired to your gait.remote)
+# Remote tools
 # ---------------------------------------------------------------------
-
-
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_remote_add(name: str, url: str) -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
         return err
     assert repo is not None
+
     remote_add(repo, name, url)
     return {"ok": True, "remote": name, "url": url}
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_remote_list(verbose: bool = True) -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
         return err
     assert repo is not None
+
     rems = remote_list(repo)
-    if verbose:
-        return {"ok": True, "remotes": rems}
-    return {"ok": True, "remotes": sorted(list(rems.keys()))}
+    return {"ok": True, "remotes": rems if verbose else sorted(list(rems.keys()))}
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_remote_get(name: str = "origin") -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
         return err
     assert repo is not None
+
     url = remote_get(repo, name)
     return {"ok": True, "remote": name, "url": url}
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_repo_create(remote: str, owner: str, repo_name: str, token: str = "") -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
@@ -571,7 +547,7 @@ def gait_repo_create(remote: str, owner: str, repo_name: str, token: str = "") -
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_push(remote: str, owner: str, repo_name: str, branch: str = "", token: str = "") -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
@@ -581,7 +557,6 @@ def gait_push(remote: str, owner: str, repo_name: str, branch: str = "", token: 
     tok = _require_gaithub_token(token)
     spec = _remote_spec(repo, remote, owner, repo_name)
 
-    # match cmd_push behavior: if remote says repo not initialized, create then retry
     try:
         remote_push(repo, spec, token=tok, branch=branch or None)
     except RuntimeError as e:
@@ -592,31 +567,25 @@ def gait_push(remote: str, owner: str, repo_name: str, branch: str = "", token: 
         else:
             raise
 
-    return {
-        "ok": True,
-        "pushed": branch or repo.current_branch(),
-        "remote": remote,
-        "owner": owner,
-        "repo": repo_name,
-    }
+    return {"ok": True, "pushed": branch or repo.current_branch(), "remote": remote, "owner": owner, "repo": repo_name}
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_fetch(remote: str, owner: str, repo_name: str, token: str = "") -> Dict[str, Any]:
     repo, err = _try_repo()
     if err:
         return err
     assert repo is not None
 
-    tok = _get_gaithub_token(token)  # fetch can be anonymous depending on your server
+    tok = _get_gaithub_token(token)  # allow anonymous if your server supports it
     spec = _remote_spec(repo, remote, owner, repo_name)
     heads, mems = remote_fetch(repo, spec, token=tok)
     return {"ok": True, "remote": remote, "owner": owner, "repo": repo_name, "heads": len(heads), "memory": len(mems)}
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_pull(
     remote: str,
     owner: str,
@@ -632,7 +601,6 @@ def gait_pull(
 
     tok = _get_gaithub_token(token)
     spec = _remote_spec(repo, remote, owner, repo_name)
-
     merge_id = remote_pull(
         repo,
         spec,
@@ -641,19 +609,15 @@ def gait_pull(
         with_memory=with_memory,
     )
 
-    out: Dict[str, Any] = {
-        "ok": True,
-        "pulled": f"{remote}/{branch or repo.current_branch()}",
-        "into": repo.current_branch(),
-        "head": merge_id,
-    }
+    out: Dict[str, Any] = {"ok": True, "pulled": f"{remote}/{branch or repo.current_branch()}",
+                           "into": repo.current_branch(), "head": merge_id}
     if with_memory:
         out["memory"] = repo.read_memory_ref(repo.current_branch())
     return out
 
 
 @mcp.tool()
-@_safe_tool
+@mcp_tool
 def gait_clone(
     url: str,
     owner: str,
@@ -670,8 +634,5 @@ def gait_clone(
     return {"ok": True, "cloned": f"{owner}/{repo_name}", "into": str(dest), "branch": branch, "remote": remote}
 
 
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
 if __name__ == "__main__":
     mcp.run()

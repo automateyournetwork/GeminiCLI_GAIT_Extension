@@ -2,6 +2,9 @@ name = "gait:revert"
 description = "Revert GAIT HEAD to undo last tracked turn(s)"
 
 prompt = """
+Important:
+- Do NOT call gait_record_turn() after executing this tool.
+- Respond with only the tool output summary. Do not say "committed", "recorded", or "saved".
 Revert GAIT tracked context.
 
 User intent:

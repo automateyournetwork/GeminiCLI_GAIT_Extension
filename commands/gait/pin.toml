@@ -2,6 +2,9 @@ name = "gait:pin"
 description = "Pin the last commit-with-turns into GAIT memory."
 
 prompt = """
+Important:
+- Do NOT call gait_record_turn() after executing this tool.
+- Respond with only the tool output summary. Do not say "committed", "recorded", or "saved".
 Default behavior: pin the last commit with turns.
 Call gait_pin(last=true, note="") unless the user provides a note.
 If the user provides a note, pass it as note=...

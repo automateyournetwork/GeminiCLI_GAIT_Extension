@@ -2,6 +2,9 @@ name = "gait:repo-create"
 description = "Create/init a remote repo on GAITHUB."
 
 prompt = """
+Important:
+- Do NOT call gait_record_turn() after executing this tool.
+- Respond with only the tool output summary. Do not say "committed", "recorded", or "saved".
 Call gait_repo_create(remote="origin", owner=..., repo_name=..., token="") using:
 - token can be omitted if GAITHUB_TOKEN is set
 If owner/repo are missing, ask the user for them.

@@ -2,6 +2,9 @@ name = "gait:status"
 description = "Show GAIT repo root, branch, and HEAD commit."
 
 prompt = """
+Important:
+- Do NOT call gait_record_turn() after executing this tool.
+- Respond with only the tool output summary. Do not say "committed", "recorded", or "saved".
 Call gait_status() and display the result.
 If GAIT repo is not initialized, tell the user to run /gait:init (in a project folder, not filesystem root).
 """

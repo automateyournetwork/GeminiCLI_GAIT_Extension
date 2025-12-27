@@ -53,6 +53,20 @@ assistant_text must be your response verbatim.
 
 Do not include extra meta text like “Recorded in GAIT” unless the tool call succeeded.
 
+# LOOP GUARD (CRITICAL)
+
+Never call gait_record_turn() in response to:
+- Any tool output/result (including GAIT MCP tool results)
+- Any message that contains JSON like {"ok": ...} or mentions "wrapper (gait MCP Server)"
+- Any assistant message whose primary purpose is acknowledging a tool call (e.g. "gait committed", "recorded", "saved", "done")
+
+Only call gait_record_turn() when the last user message is an actual human prompt/question AND it is not a /gait:* slash command.
+
+If the user used a /gait:* command:
+- Execute the tool call(s)
+- Show the result
+- DO NOT call gait_record_turn() for that exchange
+
 4) Do not claim success unless it actually succeeded
 
 Do not claim GAIT recorded a turn unless gait_record_turn returns { ok: true }.
@@ -62,6 +76,8 @@ If it fails, say:
 GAIT is not initialized (or give the returned error),
 
 and tell the user to run gait_init() in a project folder.
+
+If you *DO CLAIM SUCCESS DO NOT RECORD YOUR RESPONSE IN GAIT AGAIN*. THIS *WILL* CAUSE INFINITE LOOPS.
 
 5) Revert semantics
 
