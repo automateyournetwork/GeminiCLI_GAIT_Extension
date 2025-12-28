@@ -1,231 +1,228 @@
-GAIT — Git for AI Tracking (Gemini-CLI Extension)
+# GAIT — Git for AI Tracking (Gemini-CLI Extension)
 
 GAIT (Git for AI Tracking) brings Git-style version control to AI conversations.
 
-Install this extension 
+## Install this extension 
 
 ```bash
-
 gemini extensions install https://github.com/automateyournetwork/GeminiCLI_GAIT_Extension.git
-
 ```
 
 This repository provides a Gemini-CLI extension that automatically tracks prompts, responses, context, and branching history using GAIT as a persistent backend.
 
-Think of GAIT as version control for AI reasoning.
+**Think of GAIT as version control for AI reasoning.**
 
-What This Is
+## What This Is
 
 This project integrates GAIT with Gemini-CLI using the Model Context Protocol (MCP).
 
-Gemini-CLI acts as the interactive chat shell.
-GAIT acts as the versioned context system.
-MCP tools connect the two.
+- **Gemini-CLI** acts as the interactive chat shell.
+- **GAIT** acts as the versioned context system.
+- **MCP tools** connect the two.
 
 Once installed, every normal Gemini interaction is automatically tracked without changing how you chat.
 
-No wrappers.
-No forks.
-No modified Gemini binaries.
+- No wrappers.
+- No forks.
+- No modified Gemini binaries.
 
-What GAIT Tracks
+## What GAIT Tracks
 
 GAIT records:
 
-User prompts
+- User prompts
+- Assistant responses
+- Conversation history as commits
+- Branches and merges
+- Reverts and resets
+- Pinned memory (curated context)
+- Optional token accounting
+- Optional remote sync
 
-Assistant responses
+All data is stored locally in a `.gait/` directory, similar to `.git/`.
 
-Conversation history as commits
+## Design Principles
 
-Branches and merges
-
-Reverts and resets
-
-Pinned memory (curated context)
-
-Optional token accounting
-
-Optional remote sync
-
-All data is stored locally in a .gait/ directory, similar to .git/.
-
-Design Principles
-Gemini-CLI Is the UI
+### Gemini-CLI Is the UI
 
 Gemini-CLI remains responsible for:
 
-Model execution
-
-Authentication
-
-Conversation flow
+- Model execution
+- Authentication
+- Conversation flow
 
 GAIT is responsible for:
 
-Persistence
+- Persistence
+- Versioning
+- Context control
+- History management
 
-Versioning
+**GAIT never wraps or replaces Gemini-CLI.**
 
-Context control
-
-History management
-
-GAIT never wraps or replaces Gemini-CLI.
-
-MCP-Native Architecture
+### MCP-Native Architecture
 
 GAIT is exposed as MCP tools.
 
 This allows:
 
-Clean slash commands
+- Clean slash commands
+- Structured tool calls
+- No stdout interference
+- Full compatibility with Gemini-CLI
 
-Structured tool calls
-
-No stdout interference
-
-Full compatibility with Gemini-CLI
-
-Git-Like Mental Model
+### Git-Like Mental Model
 
 If you understand Git, GAIT will feel familiar.
 
-Conversations are commits.
-Conversation paths are branches.
-Undo is revert.
-Pinned memory is curated working context.
-Remotes allow sharing.
+- Conversations are commits.
+- Conversation paths are branches.
+- Undo is revert.
+- Pinned memory is curated working context.
+- Remotes allow sharing.
 
-Installation
-Prerequisites
+## Installation
 
-Gemini-CLI installed and working
+### Prerequisites
 
-Python 3.9 or newer
+- Gemini-CLI installed and working
+- Python 3.9 or newer
+- GAIT installed (`pip install gait-ai`)
 
-GAIT installed (pip install gait-ai)
-
-Install the Extension
+### Install the Extension
 
 Clone this repository:
 
+```bash
 git clone https://github.com/your-org/gait-gemini-extension.git
 cd gait-gemini-extension
+```
 
+Gemini-CLI automatically detects the extension via `gemini-extension.json`.
 
-Gemini-CLI automatically detects the extension via gemini-extension.json.
+## Getting Started
 
-Getting Started
-Start Gemini-CLI
+### Start Gemini-CLI
+
+```bash
 gemini
+```
 
-Initialize GAIT
+### Initialize GAIT
 
 Change into a project directory (not filesystem root):
 
+```bash
 /gait:init
+```
 
+**GAIT refuses to initialize at filesystem root for safety.**
 
-GAIT refuses to initialize at filesystem root for safety.
+This creates a `.gait/` directory that stores all history.
 
-This creates a .gait/ directory that stores all history.
-
-Normal Usage (Auto-Tracked)
+### Normal Usage (Auto-Tracked)
 
 Just chat normally.
 
 Every assistant response is automatically recorded:
 
+```
 You: Explain CAP theorem
 AI: The CAP theorem states that...
-
+```
 
 No extra commands required.
 
-Branching Conversations
+### Branching Conversations
 
 Create a new branch to explore ideas:
 
+```bash
 /gait:branch experiments
 /gait:checkout experiments
-
+```
 
 Now you can diverge safely without affecting main.
 
-Reverting (Undoing Mistakes)
+### Reverting (Undoing Mistakes)
 
 Undo the most recent tracked turn:
 
+```bash
 /gait:revert
-
+```
 
 Revert multiple turns:
 
+```bash
 /gait:revert HEAD~2
+```
 
+**Important notes:**
 
-Important notes:
+- This does not delete the visible Gemini-CLI transcript
+- It resets GAIT context going forward
+- Future responses will not include reverted content
 
-This does not delete the visible Gemini-CLI transcript
-
-It resets GAIT context going forward
-
-Future responses will not include reverted content
-
-Pinning Important Context
+### Pinning Important Context
 
 Pin the last meaningful answer into memory:
 
+```bash
 /gait:pin last
-
+```
 
 Pinned memory:
 
-Is injected into future prompts
-
-Persists across branches
-
-Acts as curated working context
+- Is injected into future prompts
+- Persists across branches
+- Acts as curated working context
 
 View pinned memory:
 
+```bash
 /gait:memory
+```
 
-Merging Conversation Branches
+### Merging Conversation Branches
 
 Merge a branch back into the current branch:
 
+```bash
 /gait:merge experiments --with-memory
-
+```
 
 This creates a merge commit and optionally merges pinned memory.
 
-Remote Repositories (Optional)
+### Remote Repositories (Optional)
 
 GAIT supports syncing conversation history to a remote GAIT server.
 
 Set a remote:
 
+```bash
 /gait:remote origin http://gaithub.example.com
-
+```
 
 Push:
 
+```bash
 /gait:push origin --owner alice --repo my-project
-
+```
 
 Pull:
 
+```bash
 /gait:pull origin --owner alice --repo my-project
-
+```
 
 This enables collaboration and shared AI workspaces.
 
-Slash Commands Overview
+## Slash Commands Overview
 
 Common commands:
 
+```bash
 /gait:init
 /gait:status
 /gait:branch NAME
@@ -238,40 +235,32 @@ Common commands:
 /gait:push
 /gait:pull
 /gait:clone
-
+```
 
 Slash commands perform operations and are not recorded as conversation turns.
 
-Important Behavior Rules
+## Important Behavior Rules
 
-Slash commands are not recorded as chat turns
+- Slash commands are not recorded as chat turns
+- Every normal assistant response is recorded
+- GAIT never writes to stdout
+- GAIT refuses unsafe operations
+- If GAIT is not initialized, you will be prompted to initialize
 
-Every normal assistant response is recorded
-
-GAIT never writes to stdout
-
-GAIT refuses unsafe operations
-
-If GAIT is not initialized, you will be prompted to initialize
-
-Who This Is For
+## Who This Is For
 
 GAIT is designed for:
 
-Developers working with LLMs
+- Developers working with LLMs
+- Prompt engineers
+- AI researchers
+- Teams collaborating on AI workflows
+- Anyone who wants reproducible AI reasoning
 
-Prompt engineers
-
-AI researchers
-
-Teams collaborating on AI workflows
-
-Anyone who wants reproducible AI reasoning
-
-Philosophy
+## Philosophy
 
 AI conversations are stateful.
 
 State deserves version control.
 
-GAIT applies software engineering discipline to AI interaction.
+**GAIT applies software engineering discipline to AI interaction.**
